@@ -25,8 +25,7 @@ print("Arguments = %s." % args)
 #
 # Load environment variables.
 #
-if args.dotenv:
-    load_dotenv(find_dotenv())
+load_dotenv(find_dotenv())
 
 TWITTER_CONSUMER_KEY = os.getenv('TWITTER_CONSUMER_KEY')
 TWITTER_CONSUMER_SECRET = os.getenv('TWITTER_CONSUMER_SECRET')
