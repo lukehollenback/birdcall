@@ -1,5 +1,6 @@
 import os
 import random
+from dotenv.main import find_dotenv
 import tweepy
 from dotenv import load_dotenv
 import argparse
@@ -10,6 +11,7 @@ from datetime import date
 #
 arg_parser = argparse.ArgumentParser()
 
+arg_parser.add_argument("--dotenv", action='store_true', help = "Whether or not environment variables should be loaded from a file.")
 arg_parser.add_argument("--query")
 arg_parser.add_argument("--friends", action='store_true', help = "Explicitly add friends to the query filter.")
 arg_parser.add_argument("--followers", action='store_true', help = "Explicitly add followers to the query filter.")
@@ -23,7 +25,8 @@ print("Arguments = %s." % args)
 #
 # Load environment variables.
 #
-load_dotenv()
+if args.dotenv:
+    load_dotenv(find_dotenv())
 
 TWITTER_CONSUMER_KEY = os.getenv('TWITTER_CONSUMER_KEY')
 TWITTER_CONSUMER_SECRET = os.getenv('TWITTER_CONSUMER_SECRET')
