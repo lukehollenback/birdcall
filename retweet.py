@@ -1,35 +1,27 @@
-import os
 import random
-from dotenv.main import find_dotenv
-import tweepy
-from dotenv import load_dotenv
 import argparse
 from datetime import date
+
+import tweepy
+
+import auth
 
 #
 # Parse arguments.
 #
 arg_parser = argparse.ArgumentParser()
 
-arg_parser.add_argument("--query")
-arg_parser.add_argument("--friends", action='store_true', help = "Explicitly add friends to the query filter.")
-arg_parser.add_argument("--followers", action='store_true', help = "Explicitly add followers to the query filter.")
-arg_parser.add_argument("--members", help = "Explicitly add members of the list with the specified id to the query filter.")
-arg_parser.add_argument("--filters", default = 15)
+arg_parser.add_argument("--query", help = "Twitter search query to use to find retweetable tweets")
+arg_parser.add_argument("--friends", action = "store_true", help = "explicitly add friends to the query filter")
+arg_parser.add_argument("--followers", action = "store_true", help = "explicitly add followers to the query filter")
+arg_parser.add_argument("--members", help = "explicitly add members of the list with the specified id to the query filter")
+arg_parser.add_argument("--filters", default = 15, help = "max number of authorship filters to add to the query")
+arg_parser.add_argument("--like", action = "store_true", help = "like tweets that get retweeted")
+arg_parser.add_argument("--follow", action = "store_true", help = "like authors of tweets that get retweeted")
 
 args = arg_parser.parse_args()
 
 print("Arguments = %s." % args)
-
-#
-# Load environment variables.
-#
-load_dotenv()
-
-TWITTER_CONSUMER_KEY = os.getenv('TWITTER_CONSUMER_KEY')
-TWITTER_CONSUMER_SECRET = os.getenv('TWITTER_CONSUMER_SECRET')
-TWITTER_ACCESS_TOKEN = os.getenv('TWITTER_ACCESS_TOKEN')
-TWITTER_ACCESS_SECRET = os.getenv('TWITTER_ACCESS_SECRET')
 
 #
 # Seed the random number generator so that we don't get the same results every time the script runs.
@@ -37,12 +29,9 @@ TWITTER_ACCESS_SECRET = os.getenv('TWITTER_ACCESS_SECRET')
 random.seed()
 
 #
-# Authenticate w/Twitter.
+# Authenticate w/Twitter and obtain a Tweepy API handle that can be used for requests.
 #
-auth = tweepy.OAuthHandler(TWITTER_CONSUMER_KEY, TWITTER_CONSUMER_SECRET)
-auth.set_access_token(TWITTER_ACCESS_TOKEN, TWITTER_ACCESS_SECRET)
-
-api = tweepy.API(auth)
+api = auth.authenticate()
 
 #
 # Interpolate dynamic values into the query.
@@ -113,7 +102,16 @@ if len(search_results) > 0:
         tweet = random.choice(search_results)
 
         try:
-            api.create_favorite(tweet.id)
+            if args.like:
+                api.create_favorite(tweet.id)
+
+                print("Linked %d." % tweet.id)
+
+            if args.follow:
+                api.create_friendship(tweet.user.id)
+
+                print("Followed %d." % tweet.user.id)
+            
             api.retweet(tweet.id)
 
             print("Retweeted %d." % tweet.id)
