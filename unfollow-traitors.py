@@ -21,10 +21,15 @@ for friend in tweepy.Cursor(api.friends, skip_status = True, include_user_entiti
     relationship = api.show_friendship(source_id = me.id, target_id = friend.id)
     
     if not relationship[0].followed_by:
-        api.destroy_friendship(friend.id)
+        try:
+            api.destroy_friendship(friend.id)
 
-        count += 1
+            count += 1
 
-        print(f"Unfollowed {friend.id} ({friend.screen_name}).")
+            print(f"Unfollowed {friend.id} ({friend.screen_name}).")
+        except tweepy.TweepError as e:
+            print(f"Failed to unfollow {friend.id} ({friend.screen_name}). (error: {e})")
+
+        
 
 print(f"Unfollowed {count} users.")
