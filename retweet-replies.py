@@ -4,6 +4,7 @@ that it links to to be retweets. Also supports liking the replies and following 
 """
 
 import argparse
+import time
 
 import tweepy
 
@@ -18,6 +19,7 @@ arg_parser.add_argument("--tweet-id", help = "id of tweet to reply the replies o
 arg_parser.add_argument("--like", action = "store_true", help = "like tweets that get retweeted")
 arg_parser.add_argument("--follow", action = "store_true", help = "like authors of tweets that get retweeted")
 arg_parser.add_argument("--max-retweets", default = 7, help = "maximum number of replies to retweet")
+arg_parser.add_argument("--delay", default = 30, help = "seconds betweet retweets")
 arg_parser.add_argument("--traverse-quotes", action = "store_true", help = "retweets quoted tweets instead of parent tweets when they exist")
 
 args = arg_parser.parse_args()
@@ -145,6 +147,11 @@ for result in tweepy.Cursor(api.search, q = query, since_id = tweet.id, include_
 
     if count >= args.max_retweets:
         break
+
+    #
+    # Wait the delay interval so that we don't spam the Twitter API.
+    #
+    time.sleep(args.delay)
 
 #
 # Log how many replies we found and retweeted.
