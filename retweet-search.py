@@ -26,7 +26,7 @@ arg_parser.add_argument("--follow", action = "store_true", help = "like authors 
 
 args = arg_parser.parse_args()
 
-print(f"Arguments ={args}.")
+print(f"Arguments = {args}.")
 
 #
 # Seed the random number generator so that we don't get the same results every time the script runs.

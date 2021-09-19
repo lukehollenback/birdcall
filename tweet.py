@@ -17,6 +17,8 @@ arg_parser.add_argument("--path", help = "file or directory (random will be chos
 
 args = arg_parser.parse_args()
 
+print(f"Arguments = {args}.")
+
 #
 # Seed the random number generator so that we don't get the same results every time the script runs.
 #

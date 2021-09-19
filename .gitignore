@@ -4,6 +4,7 @@
 
 # Test data files
 data/
+followers.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
