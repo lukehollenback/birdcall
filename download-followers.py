@@ -33,33 +33,31 @@ api = auth.authenticate()
 # If we are doing an append-only download, load the currently-downloaded followers into memory.
 #
 rows = []
+header_read = False
 
 if args.append and os.path.exists(args.output):
     with open(args.output, mode="r") as f:
         reader = csv.DictReader(f)
 
         for row in reader:
-            #
-            # Skip the header row.
-            #
-            if len(rows) == 0:
-                continue
-
-            #
-            # Load the line.
-            #
             rows.append(row)
 
-        print(f"Loaded {len(rows)} followers.")
+    print(f"Loaded {len(rows)} followers.")
 
 #
 # Download all of the specified user's followers.
 #
+downloaded_count = 0
+
 for user in tweepy.Cursor(api.followers, include_user_entities = False, screen_name = args.user, count = 200).items():
     #
     # Add the follower to the list of downloaded followers if they are not already in it.
     #
-    if not next((row for row in rows if row["id"] == user.id), None):
+    # NOTE: We must cast values from the CSV file and values from the the Twitter API to the same
+    #  type so that the comparison can work.
+    #
+    if not next((row for row in rows if int(row["id"]) == int(user.id)), None):
+        downloaded_count += 1
         row = {
             "id" : user.id,
             "screen_name" : user.screen_name,
@@ -73,6 +71,8 @@ for user in tweepy.Cursor(api.followers, include_user_entities = False, screen_n
 
         rows.append(row)
 
+print(f"Downloaded {downloaded_count} followers.")
+
 #
 # Output the results.
 #
@@ -85,4 +85,4 @@ with open(args.output, mode="w") as f:
 #
 # Output some debug information.
 #
-print(f"Downloaded {len(rows)} followers to {args.output}.")
+print(f"Saved {len(rows)} followers to {args.output}.")
