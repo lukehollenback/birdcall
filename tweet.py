@@ -13,7 +13,8 @@ import auth
 #
 arg_parser = argparse.ArgumentParser()
 
-arg_parser.add_argument("--path", help = "file or directory (random will be chosen) of files to tweet")
+arg_parser.add_argument("--path", help = "file or directory (random will be chosen) of file to tweet")
+arg_parser.add_argument("--media", help = "file or directory (random will be chosen) of media to attach to tweet")
 
 args = arg_parser.parse_args()
 
@@ -39,6 +40,16 @@ if is_directory:
     args.path = f"{args.path}/{random.choice(os.listdir(args.path))}"
 
 #
+# If a media attachment was specified, determine whether we are dealing with a single file or a
+# directory of files containing the media to upload.
+#
+if args.media:
+    is_directory = os.path.isdir(args.media)
+
+    if is_directory:
+        args.media = f"{args.media}/{random.choice(os.listdir(args.media))}"
+
+#
 # Load the content that will be tweeted.
 #
 with open(args.path, "r") as file:
@@ -47,7 +58,10 @@ with open(args.path, "r") as file:
     #
     # Tweet the content.
     #
-    tweet = api.update_status(content)
+    if args.media:
+        tweet = api.update_with_media(args.media, content)
+    else:
+        tweet = api.update_status(content)
 
     #
     # Print out the id of the new tweet (in case it needs to be piped into another script).
