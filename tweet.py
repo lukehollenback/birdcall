@@ -1,5 +1,6 @@
 """
-Tweets the content of a file, or of a random file in a directory.
+Tweets the content of a file, or of a random file in a directory. The id of the the tweet is output
+so that it can be piped into subsequent programs if desired.s
 """
 
 import argparse
@@ -19,8 +20,6 @@ arg_parser.add_argument("--delete-content", action = "store_true", help = "delet
 arg_parser.add_argument("--delete-media", action = "store_true", help = "delete the tweet's media file after posting")
 
 args = arg_parser.parse_args()
-
-print(f"Arguments = {args}.")
 
 #
 # Seed the random number generator so that we don't get the same results every time the script runs.
