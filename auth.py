@@ -3,6 +3,11 @@ import os
 import tweepy
 from dotenv import load_dotenv
 
+#
+# Authenticates with the Twitter API using the consumer key, consumer secret, access token, and
+# access secret set in the runtime environment. Returns an authenticated API client that can be used
+# to make calls.
+#
 def authenticate() -> tweepy.API:
     #
     # Load environment variables.

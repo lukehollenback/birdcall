@@ -1,6 +1,6 @@
 """
-Performs an OAuth 1a handshake to authorize a Twitter account to use this app and returns an access
-token and secret that this app can use to act on behalf of said authorized user.
+Helper script that performs an OAuth 1a handshake to authorize a Twitter account to use this app and
+returns an access token and secret that this app can use to act on behalf of said authorized user.
 """
 
 import os
