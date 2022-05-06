@@ -10,18 +10,14 @@ Given the id of a tweet, retweets replies to it. Optionally allows for the root 
 that it links to to be retweets. Also supports liking the replies and following their authors.
 """
 def retweet_replies(
+    api: tweepy.API,
     tweet_id,
     like = False,
     follow = False,
     max_retweets = 7,
     delay = 30,
     traverse_quotes = False
-):
-    #
-    # Authenticate w/Twitter and obtain a Tweepy API handle that can be used for requests.
-    #
-    api = auth.authenticate()
-    
+):    
     #
     # Fetch a set of muted user ids. We will make sure to not retweet anything by these users (for some
     # reason, muted users' tweets occasionally slip through the search filter).
@@ -165,11 +161,17 @@ if __name__=="__main__":
     args = arg_parser.parse_args()
     
     print(f"Arguments = {args}.")
+
+    #
+    # Authenticate w/Twitter and obtain a Tweepy API handle that can be used for requests.
+    #
+    api = auth.authenticate()
     
     #
     # Run logic.
     #
     retweet_replies(
+        api,
         args.tweet_id,
         args.like,
         args.follow,

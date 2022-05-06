@@ -10,12 +10,7 @@ import auth
 Given the handle of a Twitter user, download all of their followers into a CSV file for further
 archiving and/or analysis.
 """
-def download_followers(user, output, append = False):
-    #
-    # Authenticate w/Twitter and obtain a Tweepy API handle that can be used for requests.
-    #
-    api = auth.authenticate()
-    
+def download_followers(api: tweepy.API, user: str, output: str, append: bool = False):   
     #
     # If we are doing an append-only download, load the currently-downloaded followers into memory.
     #
@@ -87,8 +82,13 @@ if __name__=="__main__":
     args = arg_parser.parse_args()
 
     print(f"Arguments = {args}.")
+
+    #
+    # Authenticate w/Twitter and obtain a Tweepy API handle that can be used for requests.
+    #
+    api = auth.authenticate()
     
     #
     # Run logic.
     #
-    download_followers(args.user, args.output, args.append)
+    download_followers(api, args.user, args.output, args.append)

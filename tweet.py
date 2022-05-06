@@ -3,22 +3,19 @@ from asyncio.windows_events import NULL
 import os
 import random
 
+import tweepy
+
 import auth
 
 """
 Tweets the content of a file, or of a random file in a directory. The id of the the tweet is output
 so that it can be piped into subsequent programs if desired.s
 """
-def tweet(path, media = NULL, delete_content = False, delete_media = False):
+def tweet(api: tweepy.API, path, media = NULL, delete_content = False, delete_media = False):
     #
     # Seed the random number generator so that we don't get the same results every time the script runs.
     #
     random.seed()
-
-    #
-    # Authenticate w/Twitter and obtain a Tweepy API handle that can be used for requests.
-    #
-    api = auth.authenticate()
 
     #
     # Determine whether we are dealing with a single file or a directory of files containing content to
@@ -81,6 +78,11 @@ if __name__=="__main__":
     args = arg_parser.parse_args()
 
     #
+    # Authenticate w/Twitter and obtain a Tweepy API handle that can be used for requests.
+    #
+    api = auth.authenticate()
+
+    #
     # Run logic.
     #
-    tweet(args.path, args.media, args.delete_content, args.delete_media)
+    tweet(api, args.path, args.media, args.delete_content, args.delete_media)

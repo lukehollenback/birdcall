@@ -5,11 +5,10 @@ import auth
 """
 Unfollows anyone that is not currently following the authenticated user.
 """
-def unfollow_traitors():
+def unfollow_traitors(api: tweepy.API):
     #
-    # Authenticate w/Twitter and obtain a Tweepy API handle that can be used for requests.
+    # Get a handle on the authenticated user.
     #
-    api = auth.authenticate()
     me = api.me()
 
     #
@@ -35,6 +34,11 @@ def unfollow_traitors():
     print(f"Unfollowed {count} users.")
 
 if __name__=="__main__":
+    #
+    # Authenticate w/Twitter and obtain a Tweepy API handle that can be used for requests.
+    #
+    api = auth.authenticate()
+
     #
     # Run logic.
     #

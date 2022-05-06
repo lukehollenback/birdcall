@@ -1,6 +1,7 @@
 # OS and IDE files
-.vscode/
 .DS_Store
+.idea/
+.vscode/
 
 # Test data files
 data/
@@ -24,6 +25,7 @@ eggs/
 .eggs/
 lib/
 lib64/
+out/
 parts/
 sdist/
 var/

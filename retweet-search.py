@@ -11,6 +11,7 @@ Given a search criteria, retweets a random result tweet. Also supports liking of
 following its author.
 """
 def retweet_search(
+    api: tweepy.API,
     query,
     friends = False,
     followers = False,
@@ -23,11 +24,6 @@ def retweet_search(
     # Seed the random number generator so that we don't get the same results every time the script runs.
     #
     random.seed()
-    
-    #
-    # Authenticate w/Twitter and obtain a Tweepy API handle that can be used for requests.
-    #
-    api = auth.authenticate()
     
     #
     # Fetch a set of muted user ids. We will make sure to not retweet anything by these users (for some
@@ -158,11 +154,17 @@ if __name__=="__main__":
     args = arg_parser.parse_args()
     
     print(f"Arguments = {args}.")
+
+    #
+    # Authenticate w/Twitter and obtain a Tweepy API handle that can be used for requests.
+    #
+    api = auth.authenticate()
     
     #
     # Run logic.
     #
     retweet_search(
+        api,
         args.query,
         args.friends,
         args.followers,
