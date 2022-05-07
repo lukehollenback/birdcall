@@ -1,0 +1,465 @@
+import csv
+from datetime import date
+import os.path
+import random
+import time
+
+from dotenv import load_dotenv
+import tweepy
+
+
+class Birdcall:
+    api: tweepy.API = None
+
+    def auth(self):
+        """
+        Authenticates with the Twitter API using the consumer key, consumer secret, access token, and
+        access secret set in the runtime environment. Returns an authenticated API client that can be used
+        to make calls.
+        """
+
+        #
+        # Load environment variables.
+        #
+        load_dotenv()
+
+        twitter_consumer_key = os.getenv('twitter_consumer_key')
+        twitter_consumer_secret = os.getenv('twitter_consumer_secret')
+        twitter_access_token = os.getenv('twitter_access_token')
+        twitter_access_secret = os.getenv('twitter_access_secret')
+
+        #
+        # Authenticate w/Twitter and store the authenticated client.
+        #
+        auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
+        auth.set_access_token(twitter_access_token, twitter_access_secret)
+
+        self.api = tweepy.API(auth)
+
+    def download_followers(self, user: str, output: str, append: bool = False):
+        """
+        Given the handle of a Twitter user, download all of their followers into a CSV file for further
+        archiving and/or analysis.
+        """
+
+        #
+        # If we are doing an append-only download, load the currently-downloaded followers into memory.
+        #
+        rows = []
+
+        if append and os.path.exists(output):
+            with open(output, mode="r") as f:
+                reader = csv.DictReader(f)
+
+                for row in reader:
+                    rows.append(row)
+
+            print(f"Loaded {len(rows)} followers.")
+
+        #
+        # Download all the specified user's followers.
+        #
+        downloaded_count = 0
+
+        for user in tweepy.Cursor(
+                self.api.followers,
+                include_user_entities=False,
+                screen_name=user,
+                count=200
+        ).items():
+            #
+            # Add the follower to the list of downloaded followers if they are not already in it.
+            #
+            # NOTE: We must cast values from the CSV file and values from the Twitter API to the same
+            #  type so that the comparison can work.
+            #
+            if not next((row for row in rows if int(row["id"]) == int(user.id)), None):
+                downloaded_count += 1
+                row = {
+                    "id": user.id,
+                    "screen_name": user.screen_name,
+                    "name": user.name,
+                    "location": user.location,
+                    "bio": user.description,
+                    "website": user.url,
+                    "direct_message_link": (f"https://twitter.com/messages/compose?recipient_id=%d" % user.id),
+                    "direct_messaged": False
+                }
+
+                rows.append(row)
+
+        print(f"Downloaded {downloaded_count} followers.")
+
+        #
+        # Output the results.
+        #
+        with open(output, mode="w") as f:
+            writer = csv.DictWriter(f, fieldnames=rows[0].keys())
+
+            writer.writeheader()
+            writer.writerows(rows)
+
+        #
+        # Output some debug information.
+        #
+        print(f"Saved {len(rows)} followers to {output}.")
+
+    def retweet_replies(
+            self,
+            tweet_id,
+            like=False,
+            follow=False,
+            max_retweets=7,
+            delay=30,
+            traverse_quotes=False
+    ):
+        """
+        Given the id of a tweet, retweets replies to it. Optionally allows for the root reply or a tweet
+        that it links to be retweets. Also supports liking the replies and following their authors.
+        """
+
+        #
+        # Fetch a set of muted user ids. We will make sure to not retweet anything by these users (for some
+        # reason, muted users' tweets occasionally slip through the search filter).
+        #
+        muted_ids = []
+
+        for mute_id in tweepy.Cursor(self.api.mutes_ids).items():
+            muted_ids.append(mute_id)
+
+        print(f"Loaded {len(muted_ids)} mutes.")
+
+        #
+        # Query for replies to the specified tweet.
+        #
+        tweet = self.api.get_status(tweet_id, include_entities=False)
+        query = f"to:{tweet.user.screen_name} -from:{tweet.user.screen_name}"
+
+        print(f"Searching for \"{query}\".")
+
+        count = 0
+
+        for result in tweepy.Cursor(self.api.search, q=query, since_id=tweet.id, include_entities=False).items():
+            #
+            # Make sure we actually care about this tweet.
+            #
+            # NOTE: Because we are using the basic Twitter API (rather than the premium or enterprise
+            #  versions), there is a chance that our result set will include tweets that were replies to
+            #  more recent tweet than the desired one. We must filter out such results manually.
+            #
+            if result.in_reply_to_status_id != tweet.id:
+                print(f"Skipping {result.id} as it is not a reply to {tweet.id}.")
+
+                continue
+
+            if result.user.id in muted_ids:
+                print(f"Skipping tweet ({result.id}) from muted user ({result.user.id}).")
+
+                continue
+
+            print(f"Processing reply {result.id}.")
+
+            #
+            # Determine the tweet (either the reply, or a tweet quoted in the reply) that we would actually
+            # like to process.
+            #
+            reply = result
+
+            if traverse_quotes and hasattr(result, "quoted_status"):
+                # NOTE: The Tweet.quoted_status payload does not contain some useful flags – like favorited
+                #  or retweeted. So, unfortunately, we must fetch the full Tweet object for the quote.
+
+                reply = self.api.get_status(result.quoted_status_id, include_entities=False)
+
+                print(f"Traversed to quoted tweet ({reply.id}) in reply {result.id}).")
+
+            #
+            # If we have already retweeted the reply, skip it.
+            #
+            # NOTE: The "retweeted" and "favorited" flags of the Twitter API's "Tweet" object do not appear
+            #  to be bullet-proof. So this is a best-effort check, but we still must handle failures
+            #  below.
+            #
+            if reply.retweeted:
+                print(f"Skipping {result.id} as we have already processed it.")
+
+                continue
+
+            #
+            # Retweet, like, and follow the author of the actual tweet that we need to process. If we
+            # traversed into quoted tweets and liking is enabled, we also make sure to like the parent
+            # tweet.
+            #
+            # NOTE: Since the core goal of this script is to retweet, a retweet failure will skip all other
+            #  desired actions (e.g. liking the tweet or following its author).
+            #
+            try:
+                self.api.retweet(reply.id)
+
+                print("Retweeted %d." % reply.id)
+            except tweepy.TweepError as e:
+                print(f"Failed to retweet {reply.id}. Will not count it. (error: {e})")
+
+                continue
+
+            if like:
+                try:
+                    self.api.create_favorite(reply.id)
+
+                    print("Liked %d." % reply.id)
+                except tweepy.TweepError as e:
+                    print(f"Failed to like {reply.id}. (error: {e})")
+
+                if reply != result:
+                    try:
+                        self.api.create_favorite(result.id)
+
+                        print("Liked %d." % result.id)
+                    except tweepy.TweepError as e:
+                        print(f"Failed to like {result.id}. (error: {e})")
+
+            if follow:
+                try:
+                    self.api.create_friendship(reply.user.id)
+
+                    print("Followed %d." % reply.user.id)
+                except tweepy.TweepError as e:
+                    print(f"Failed to follow {reply.id}'s author ({reply.user.id}). (error: {e})")
+
+            #
+            # Increment the count and bail if we have retweeted our maximum number of replies.
+            #
+            count += 1
+
+            if count >= max_retweets:
+                break
+
+            #
+            # Wait the delay interval so that we don't spam the Twitter API.
+            #
+            time.sleep(delay)
+
+        #
+        # Log how many replies we found and retweeted.
+        #
+        print(f"Retweeted {count} replies to {tweet.id}.")
+
+    def retweet_search(
+            self,
+            query,
+            friends=False,
+            followers=False,
+            members=[],
+            filter_count=15,
+            like=False,
+            follow=False
+    ):
+        """
+        Given a search criteria, retweets a random result tweet. Also supports liking of said tweet and
+        following its author.
+        """
+
+        #
+        # Seed the random number generator so that we don't get the same results every time the script runs.
+        #
+        random.seed()
+
+        #
+        # Fetch a set of muted user ids. We will make sure to not retweet anything by these users (for some
+        # reason, muted users' tweets occasionally slip through the search filter).
+        #
+        muted_ids = []
+
+        for mute_id in tweepy.Cursor(self.api.mutes_ids).items():
+            muted_ids.append(mute_id)
+
+        print(f"Loaded {len(muted_ids)} mutes.")
+
+        #
+        # Interpolate dynamic values into the query.
+        #
+        query = query.format(today=date.today().strftime("%Y-%m-%d"))
+
+        #
+        # Process dynamic authorship filters into the query.
+        #
+        usernames = []
+
+        if friends:
+            for account in tweepy.Cursor(self.api.friends, skip_status=True, include_user_entities=False).items():
+                if account.screen_name not in usernames:
+                    usernames.append(account.screen_name)
+
+        if followers:
+            for account in tweepy.Cursor(self.api.followers, skip_status=True, include_user_entities=False).items():
+                if account.screen_name not in usernames:
+                    usernames.append(account.screen_name)
+
+        if members and len(members) > 0:
+            for account in tweepy.Cursor(self.api.list_members, list_id=members).items():
+                if account.screen_name not in usernames:
+                    usernames.append(account.screen_name)
+
+        if len(usernames) > 0:
+            random.shuffle(usernames)
+
+            count = 0
+            query += " ("
+
+            for username in usernames:
+                if count > 0:
+                    query += " OR "
+
+                query += f"from:{username}"
+                count += 1
+
+                if count >= filter_count:
+                    break
+
+            query += ")"
+
+        #
+        # Perform the search.
+        #
+        print(f"Searching for \"{query}\".")
+
+        results = self.api.search(
+            q=query,
+            result_type='recent',
+            include_entities=False,
+            count=25
+        )
+
+        print(f"Found {len(results)} search results.")
+
+        #
+        # Retweet a random tweet from the search results. Attempt up to five times to find one that the bot
+        # has not already retweeted.
+        #
+        # NOTE: Since the goal of this script is primarily to retweet, we try to do that first. If it fails,
+        #  we burn the attempt and move on to another. Otherwise, we proceed to try to like the tweet and
+        #  follow its author.
+        #
+        if len(results) > 0:
+            for i in range(5):
+                tweet = random.choice(results)
+
+                if tweet.user.id in muted_ids:
+                    print(f"Skipping tweet ({tweet.id}) from muted user ({tweet.user.id}).")
+
+                    continue
+
+                try:
+                    self.api.retweet(tweet.id)
+
+                    print("Retweeted %d." % tweet.id)
+                except tweepy.TweepError as e:
+                    print(f"Failed to retweet {tweet.id}. (error: {e.response.text}")
+
+                    continue
+
+                if like:
+                    try:
+                        self.api.create_favorite(tweet.id)
+
+                        print("Liked %d." % tweet.id)
+                    except tweepy.TweepError as e:
+                        print(f"Failed to like {tweet.id}. (error: {e.response.text}")
+
+                if follow:
+                    try:
+                        self.api.create_friendship(tweet.user.id)
+
+                        print("Followed %d." % tweet.user.id)
+                    except tweepy.TweepError as e:
+                        print(f"Failed to follow {tweet.id}'s author ({tweet.user.id}). (error: {e.response.text}")
+
+                break
+
+    def tweet(self, path, media=None, delete_content=False, delete_media=False):
+        """
+        Tweets the content of a file, or of a random file in a directory. The id of the tweet is output
+        so that it can be piped into subsequent programs if desired.s
+        """
+
+        #
+        # Seed the random number generator so that we don't get the same results every time the script runs.
+        #
+        random.seed()
+
+        #
+        # Determine whether we are dealing with a single file or a directory of files containing content to
+        # tweet.
+        #
+        is_directory = os.path.isdir(path)
+
+        if is_directory:
+            path = f"{path}/{random.choice(os.listdir(path))}"
+
+        #
+        # If a media attachment was specified, determine whether we are dealing with a single file or a
+        # directory of files containing the media to upload.
+        #
+        if media:
+            is_directory = os.path.isdir(media)
+
+            if is_directory:
+                media = f"{media}/{random.choice(os.listdir(media))}"
+
+        #
+        # Load the content that will be tweeted.
+        #
+        with open(path, "r") as file:
+            content = file.read()
+
+            #
+            # Tweet the content.
+            #
+            if media:
+                tweet = self.api.update_with_media(media, content)
+            else:
+                tweet = self.api.update_status(content)
+
+            #
+            # Print out the id of the new tweet (in case it needs to be piped into another script).
+            #
+            print(tweet.id)
+
+        #
+        # Delete files if necessary.
+        #
+        if delete_content:
+            os.remove(path)
+
+        if media and delete_media:
+            os.remove(media)
+
+    def unfollow_traitors(self):
+        """
+        Unfollows anyone that is not currently following the authenticated user.
+        """
+
+        #
+        # Get a handle on the authenticated user.
+        #
+        me = self.api.me()
+
+        #
+        # Iterate through all friends. Destroy the friendship if they are not following us.
+        #
+        count = 0
+
+        for friend in tweepy.Cursor(self.api.friends, skip_status=True, include_user_entities=False).items():
+            relationship = self.api.show_friendship(source_id=me.id, target_id=friend.id)
+
+            if not relationship[0].followed_by:
+                try:
+                    self.api.destroy_friendship(friend.id)
+
+                    count += 1
+
+                    print(f"Unfollowed {friend.id} ({friend.screen_name}).")
+                except tweepy.TweepError as e:
+                    print(f"Failed to unfollow {friend.id} ({friend.screen_name}). (error: {e})")
+
+        print(f"Unfollowed {count} users.")
