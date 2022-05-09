@@ -23,10 +23,10 @@ class Birdcall:
         #
         load_dotenv()
 
-        twitter_consumer_key = os.getenv('twitter_consumer_key')
-        twitter_consumer_secret = os.getenv('twitter_consumer_secret')
-        twitter_access_token = os.getenv('twitter_access_token')
-        twitter_access_secret = os.getenv('twitter_access_secret')
+        twitter_consumer_key = os.getenv('TWITTER_CONSUMER_KEY')
+        twitter_consumer_secret = os.getenv('TWITTER_CONSUMER_SECRET')
+        twitter_access_token = os.getenv('TWITTER_ACCESS_TOKEN')
+        twitter_access_secret = os.getenv('TWITTER_ACCESS_SECRET')
 
         #
         # Authenticate w/Twitter and store the authenticated client.
