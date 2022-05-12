@@ -5,9 +5,20 @@ oauthlib==3.1.1
 python-dotenv==0.18.0
 requests==2.25.1
 six==1.16.0
-tweepy==3.10.0
+tweepy~=4.9.0
 urllib3==1.26.6
 
 pip~=21.3.1
 wheel~=0.37.1
 setuptools~=60.2.0
+docutils~=0.18.1
+keyring~=23.5.0
+rich~=12.4.0
+Pygments~=2.12.0
+commonmark~=0.9.1
+twine~=4.0.0
+rfc3986~=2.0.0
+pkginfo~=1.8.2
+webencodings~=0.5.1
+bleach~=5.0.0
+zipp~=3.8.0

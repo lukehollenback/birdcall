@@ -62,7 +62,7 @@ class Birdcall:
         downloaded_count = 0
 
         for user in tweepy.Cursor(
-                self.api.followers,
+                self.api.get_followers,
                 include_user_entities=False,
                 screen_name=user,
                 count=200
@@ -124,7 +124,7 @@ class Birdcall:
         #
         muted_ids = []
 
-        for mute_id in tweepy.Cursor(self.api.mutes_ids).items():
+        for mute_id in tweepy.Cursor(self.api.get_muted_ids).items():
             muted_ids.append(mute_id)
 
         print(f"Loaded {len(muted_ids)} mutes.")
@@ -139,7 +139,7 @@ class Birdcall:
 
         count = 0
 
-        for result in tweepy.Cursor(self.api.search, q=query, since_id=tweet.id, include_entities=False).items():
+        for result in tweepy.Cursor(self.api.search_tweets, q=query, since_id=tweet.id, include_entities=False).items():
             #
             # Make sure we actually care about this tweet.
             #
@@ -197,7 +197,7 @@ class Birdcall:
                 self.api.retweet(reply.id)
 
                 print("Retweeted %d." % reply.id)
-            except tweepy.TweepError as e:
+            except tweepy.TweepyException as e:
                 print(f"Failed to retweet {reply.id}. Will not count it. (error: {e})")
 
                 continue
@@ -207,7 +207,7 @@ class Birdcall:
                     self.api.create_favorite(reply.id)
 
                     print("Liked %d." % reply.id)
-                except tweepy.TweepError as e:
+                except tweepy.TweepyException as e:
                     print(f"Failed to like {reply.id}. (error: {e})")
 
                 if reply != result:
@@ -215,7 +215,7 @@ class Birdcall:
                         self.api.create_favorite(result.id)
 
                         print("Liked %d." % result.id)
-                    except tweepy.TweepError as e:
+                    except tweepy.TweepyException as e:
                         print(f"Failed to like {result.id}. (error: {e})")
 
             if follow:
@@ -223,7 +223,7 @@ class Birdcall:
                     self.api.create_friendship(reply.user.id)
 
                     print("Followed %d." % reply.user.id)
-                except tweepy.TweepError as e:
+                except tweepy.TweepyException as e:
                     print(f"Failed to follow {reply.id}'s author ({reply.user.id}). (error: {e})")
 
             #
@@ -270,7 +270,7 @@ class Birdcall:
         #
         muted_ids = []
 
-        for mute_id in tweepy.Cursor(self.api.mutes_ids).items():
+        for mute_id in tweepy.Cursor(self.api.get_muted_ids).items():
             muted_ids.append(mute_id)
 
         print(f"Loaded {len(muted_ids)} mutes.")
@@ -286,17 +286,17 @@ class Birdcall:
         usernames = []
 
         if friends:
-            for account in tweepy.Cursor(self.api.friends, skip_status=True, include_user_entities=False).items():
+            for account in tweepy.Cursor(self.api.get_friends, skip_status=True, include_user_entities=False).items():
                 if account.screen_name not in usernames:
                     usernames.append(account.screen_name)
 
         if followers:
-            for account in tweepy.Cursor(self.api.followers, skip_status=True, include_user_entities=False).items():
+            for account in tweepy.Cursor(self.api.get_followers, skip_status=True, include_user_entities=False).items():
                 if account.screen_name not in usernames:
                     usernames.append(account.screen_name)
 
         if members and len(members) > 0:
-            for account in tweepy.Cursor(self.api.list_members, list_id=members).items():
+            for account in tweepy.Cursor(self.api.get_list_members, list_id=members).items():
                 if account.screen_name not in usernames:
                     usernames.append(account.screen_name)
 
@@ -323,7 +323,7 @@ class Birdcall:
         #
         print(f"Searching for \"{query}\".")
 
-        results = self.api.search(
+        results = self.api.search_tweets(
             q=query,
             result_type='recent',
             include_entities=False,
@@ -341,7 +341,7 @@ class Birdcall:
         #  follow its author.
         #
         if len(results) > 0:
-            for i in range(5):
+            for _ in range(5):
                 tweet = random.choice(results)
 
                 if tweet.user.id in muted_ids:
@@ -353,8 +353,8 @@ class Birdcall:
                     self.api.retweet(tweet.id)
 
                     print("Retweeted %d." % tweet.id)
-                except tweepy.TweepError as e:
-                    print(f"Failed to retweet {tweet.id}. (error: {e.response.text}")
+                except tweepy.TweepyException as e:
+                    print(f"Failed to retweet {tweet.id}. (error: {e}")
 
                     continue
 
@@ -363,16 +363,16 @@ class Birdcall:
                         self.api.create_favorite(tweet.id)
 
                         print("Liked %d." % tweet.id)
-                    except tweepy.TweepError as e:
-                        print(f"Failed to like {tweet.id}. (error: {e.response.text}")
+                    except tweepy.TweepyException as e:
+                        print(f"Failed to like {tweet.id}. (error: {e}")
 
                 if follow:
                     try:
                         self.api.create_friendship(tweet.user.id)
 
                         print("Followed %d." % tweet.user.id)
-                    except tweepy.TweepError as e:
-                        print(f"Failed to follow {tweet.id}'s author ({tweet.user.id}). (error: {e.response.text}")
+                    except tweepy.TweepyException as e:
+                        print(f"Failed to follow {tweet.id}'s author ({tweet.user.id}). (error: {e}")
 
                 break
 
@@ -416,7 +416,7 @@ class Birdcall:
             # Tweet the content.
             #
             if media:
-                tweet = self.api.update_with_media(media, content)
+                tweet = self.api.update_status_with_media(media, content)
             else:
                 tweet = self.api.update_status(content)
 
@@ -442,15 +442,15 @@ class Birdcall:
         #
         # Get a handle on the authenticated user.
         #
-        me = self.api.me()
+        me = self.api.verify_credentials()
 
         #
         # Iterate through all friends. Destroy the friendship if they are not following us.
         #
         count = 0
 
-        for friend in tweepy.Cursor(self.api.friends, skip_status=True, include_user_entities=False).items():
-            relationship = self.api.show_friendship(source_id=me.id, target_id=friend.id)
+        for friend in tweepy.Cursor(self.api.get_friends, skip_status=True, include_user_entities=False).items():
+            relationship = self.api.get_friendship(source_id=me.id, target_id=friend.id)
 
             if not relationship[0].followed_by:
                 try:
@@ -459,7 +459,7 @@ class Birdcall:
                     count += 1
 
                     print(f"Unfollowed {friend.id} ({friend.screen_name}).")
-                except tweepy.TweepError as e:
+                except tweepy.TweepyException as e:
                     print(f"Failed to unfollow {friend.id} ({friend.screen_name}). (error: {e})")
 
         print(f"Unfollowed {count} users.")
