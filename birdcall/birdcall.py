@@ -11,7 +11,7 @@ import tweepy
 class Birdcall:
     api: tweepy.API = None
 
-    def auth(self):
+    def auth(self, consumer_key=None, consumer_secret=None, access_token=None, access_secret=None):
         """
         Authenticates with the Twitter API using the consumer key, consumer secret, access token, and
         access secret set in the runtime environment. Returns an authenticated API client that can be used
@@ -23,10 +23,10 @@ class Birdcall:
         #
         load_dotenv()
 
-        twitter_consumer_key = os.getenv('TWITTER_CONSUMER_KEY')
-        twitter_consumer_secret = os.getenv('TWITTER_CONSUMER_SECRET')
-        twitter_access_token = os.getenv('TWITTER_ACCESS_TOKEN')
-        twitter_access_secret = os.getenv('TWITTER_ACCESS_SECRET')
+        twitter_consumer_key = os.getenv('TWITTER_CONSUMER_KEY', consumer_key)
+        twitter_consumer_secret = os.getenv('TWITTER_CONSUMER_SECRET', consumer_secret)
+        twitter_access_token = os.getenv('TWITTER_ACCESS_TOKEN', access_token)
+        twitter_access_secret = os.getenv('TWITTER_ACCESS_SECRET', access_secret)
 
         #
         # Authenticate w/Twitter and store the authenticated client.
@@ -34,7 +34,7 @@ class Birdcall:
         auth = tweepy.OAuthHandler(twitter_consumer_key, twitter_consumer_secret)
         auth.set_access_token(twitter_access_token, twitter_access_secret)
 
-        self.api = tweepy.API(auth)
+        self.api = tweepy.API(auth, wait_on_rate_limit=True)
 
     def download_followers(self, user: str, output: str, append: bool = False):
         """
@@ -63,9 +63,9 @@ class Birdcall:
 
         for user in tweepy.Cursor(
                 self.api.get_followers,
+                count=1000,
                 include_user_entities=False,
-                screen_name=user,
-                count=200
+                screen_name=user
         ).items():
             #
             # Add the follower to the list of downloaded followers if they are not already in it.
@@ -291,7 +291,7 @@ class Birdcall:
                     usernames.append(account.screen_name)
 
         if followers:
-            for account in tweepy.Cursor(self.api.get_followers, skip_status=True, include_user_entities=False).items():
+            for account in tweepy.Cursor(self.api.get_followers, count=1000, skip_status=True, include_user_entities=False).items():
                 if account.screen_name not in usernames:
                     usernames.append(account.screen_name)
 
