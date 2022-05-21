@@ -1,3 +1,4 @@
+import array
 import csv
 from datetime import date
 import os.path
@@ -106,7 +107,9 @@ class Birdcall:
 
     def retweet_replies(
             self,
-            tweet_id,
+            tweet_query=None,
+            tweet_query_count=3,
+            tweet_id=None,
             like=False,
             follow=False,
             max_retweets=7,
@@ -132,14 +135,54 @@ class Birdcall:
         #
         # Query for replies to the specified tweet.
         #
-        tweet = self.api.get_status(tweet_id, include_entities=False)
-        query = f"to:{tweet.user.screen_name} -from:{tweet.user.screen_name}"
+        # NOTE: This is a bit of a tricky section. We first try to find the tweets that we care about replies to. Then,
+        #  since we cannot directly query for replies to a specific Tweet using Twitter's standard API, we have to
+        #  simply query for all recent replies to the authors of the desired tweets and do manual filtering.
+        #
+
+        # Build up a chronologically-ordered list of ids and authors of the tweets that we want to find replies to.
+        tweet_ids = []
+        tweet_authors = []
+
+        if tweet_id is not None:
+            tweet = self.api.get_status(tweet_id, include_entities=False)
+            tweet_ids.append(tweet.id)
+            tweet_authors.append(tweet.user.screen_name)
+
+        if tweet_query is not None:
+            for tweet in tweepy.Cursor(
+                    self.api.search_tweets,
+                    q=tweet_query,
+                    count=tweet_query_count,
+                    include_entities=False
+            ).items():
+                if tweet.id not in tweet_ids:
+                    tweet_ids.append(tweet.id)
+
+                if tweet.user.screen_name not in tweet_authors:
+                    tweet_authors.append(tweet.user.screen_name)
+
+        tweet_ids = sorted(tweet_ids)
+
+        # Build up and execute the query.
+        query = ""
+
+        for tweet_author in tweet_authors:
+            if len(query) > 0:
+                query += " OR "
+
+            query += f"(to:{tweet_author} -from:{tweet_author})"
 
         print(f"Searching for \"{query}\".")
 
         count = 0
 
-        for result in tweepy.Cursor(self.api.search_tweets, q=query, since_id=tweet.id, include_entities=False).items():
+        for result in tweepy.Cursor(
+                self.api.search_tweets,
+                q=query,
+                since_id=tweet_ids[0],
+                include_entities=False
+        ).items():
             #
             # Make sure we actually care about this tweet.
             #
@@ -147,8 +190,8 @@ class Birdcall:
             #  versions), there is a chance that our result set will include tweets that were replies to
             #  more recent tweet than the desired one. We must filter out such results manually.
             #
-            if result.in_reply_to_status_id != tweet.id:
-                print(f"Skipping {result.id} as it is not a reply to {tweet.id}.")
+            if result.in_reply_to_status_id not in tweet_ids:
+                print(f"Skipping {result.id} as it is not a reply to {tweet_ids}.")
 
                 continue
 
@@ -376,10 +419,10 @@ class Birdcall:
 
                 break
 
-    def tweet(self, path, media=None, delete_content=False, delete_media=False):
+    def tweet(self, tweet_path, media_path=None, delete_content=False, delete_media=False):
         """
-        Tweets the content of a file, or of a random file in a directory. The id of the tweet is output
-        so that it can be piped into subsequent programs if desired.s
+        Tweets the content of a file, or of a random file in a directory. The id of the tweet is output and returned so
+        that it can be piped into subsequent programs if desired.
         """
 
         #
@@ -391,34 +434,35 @@ class Birdcall:
         # Determine whether we are dealing with a single file or a directory of files containing content to
         # tweet.
         #
-        is_directory = os.path.isdir(path)
+        is_directory = os.path.isdir(tweet_path)
 
         if is_directory:
-            path = f"{path}/{random.choice(os.listdir(path))}"
+            tweet_path = f"{tweet_path}/{random.choice(os.listdir(tweet_path))}"
 
         #
         # If a media attachment was specified, determine whether we are dealing with a single file or a
         # directory of files containing the media to upload.
         #
-        if media:
-            is_directory = os.path.isdir(media)
+        if media_path:
+            is_directory = os.path.isdir(media_path)
 
             if is_directory:
-                media = f"{media}/{random.choice(os.listdir(media))}"
+                media_path = f"{media_path}/{random.choice(os.listdir(media_path))}"
 
         #
         # Load the content that will be tweeted.
         #
-        with open(path, "r") as file:
+        with open(tweet_path, "r") as file:
             content = file.read()
 
             #
             # Tweet the content.
             #
-            if media:
-                tweet = self.api.update_status_with_media(media, content)
+            if media_path:
+                media = self.api.media_upload(filename=media_path)
+                tweet = self.api.update_status(status=content, media_ids=[media.media_id])
             else:
-                tweet = self.api.update_status(content)
+                tweet = self.api.update_status(status=content)
 
             #
             # Print out the id of the new tweet (in case it needs to be piped into another script).
@@ -429,10 +473,15 @@ class Birdcall:
         # Delete files if necessary.
         #
         if delete_content:
-            os.remove(path)
+            os.remove(tweet_path)
 
-        if media and delete_media:
-            os.remove(media)
+        if media_path and delete_media:
+            os.remove(media_path)
+
+        #
+        # Return the tweet id.
+        #
+        return tweet.id
 
     def unfollow_traitors(self):
         """

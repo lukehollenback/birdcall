@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='birdcall',
-    version='1.0.6',
+    version='1.0.7',
     packages=setuptools.find_packages(),
     url='https://github.com/lukehollenback/birdcall',
     license='Apache License 2.0',
