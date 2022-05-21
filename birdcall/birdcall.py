@@ -286,7 +286,7 @@ class Birdcall:
         usernames = []
 
         if friends:
-            for account in tweepy.Cursor(self.api.get_friends, skip_status=True, include_user_entities=False).items():
+            for account in tweepy.Cursor(self.api.get_friends, count=1000, skip_status=True, include_user_entities=False).items():
                 if account.screen_name not in usernames:
                     usernames.append(account.screen_name)
 
@@ -296,7 +296,7 @@ class Birdcall:
                     usernames.append(account.screen_name)
 
         if members and len(members) > 0:
-            for account in tweepy.Cursor(self.api.get_list_members, list_id=members).items():
+            for account in tweepy.Cursor(self.api.get_list_members, list_id=members, count=1000).items():
                 if account.screen_name not in usernames:
                     usernames.append(account.screen_name)
 
@@ -449,7 +449,7 @@ class Birdcall:
         #
         count = 0
 
-        for friend in tweepy.Cursor(self.api.get_friends, skip_status=True, include_user_entities=False).items():
+        for friend in tweepy.Cursor(self.api.get_friends, count=1000, skip_status=True, include_user_entities=False).items():
             relationship = self.api.get_friendship(source_id=me.id, target_id=friend.id)
 
             if not relationship[0].followed_by:
