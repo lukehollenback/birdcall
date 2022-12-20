@@ -150,12 +150,16 @@ class Birdcall:
             tweet_authors.append(tweet.user.screen_name)
 
         if tweet_query is not None:
+            print(f"Searching for \"{tweet_query}\".")
+
             for tweet in tweepy.Cursor(
                     self.api.search_tweets,
                     q=tweet_query,
                     count=tweet_query_count,
                     include_entities=False
             ).items():
+                print(f"Adding result tweet {tweet.id} to the list of tweets to find replies to.")
+
                 if tweet.id not in tweet_ids:
                     tweet_ids.append(tweet.id)
 
